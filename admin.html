@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>MyCuisine · Admin Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Geist:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="gate" id="adminGate">
+  <div class="gate-card">
+    <img class="gate-emblem light-only" src="assets/mycuisine-emblem-light.svg" alt="MyCuisine">
+    <img class="gate-emblem dark-only" src="assets/mycuisine-emblem-dark.svg" alt="MyCuisine">
+    <div class="kicker">Admin Portal</div>
+    <h1 class="gate-title">Kitchen control room.</h1>
+    <p class="gate-copy">Enter the admin password to manage recipes, categories, restrictions, and export the updated recipes.js file.</p>
+    <form id="adminGateForm">
+      <div class="field">
+        <label for="adminPassword">Admin Password</label>
+        <input id="adminPassword" type="password" placeholder="Enter admin password" autocomplete="current-password" />
+      </div>
+      <button class="btn btn-primary" type="submit" style="width:100%">Open Admin</button>
+      <div class="error" id="adminGateError">Incorrect admin password.</div>
+    </form>
+  </div>
+</div>
+
+<nav>
+  <div class="nav-inner">
+    <a class="brand" href="index.html" aria-label="MyCuisine home">
+      <img class="emblem light-only" src="assets/mycuisine-emblem-light.svg" alt="">
+      <img class="emblem dark-only" src="assets/mycuisine-emblem-dark.svg" alt="">
+      <img class="wordmark light-only" src="assets/mycuisine-wordmark-light.svg" alt="MyCuisine">
+      <img class="wordmark dark-only" src="assets/mycuisine-wordmark-dark.svg" alt="MyCuisine">
+    </a>
+    <div class="nav-label">Admin Portal</div>
+    <div class="nav-right">
+      <a class="admin-link" href="index.html">← Recipe View</a>
+      <button class="pill-toggle" type="button" onclick="toggleTheme()" aria-label="Toggle theme"><span id="lightPill">Light</span><span id="darkPill">Dark</span></button>
+    </div>
+  </div>
+</nav>
+
+<main class="admin-layout">
+  <section class="admin-hero">
+    <div>
+      <div class="kicker">MyCuisine — Admin Portal</div>
+      <h1>Manage the private table.</h1>
+      <p>Add recipes, let the system auto-detect categories and dietary warnings, then export a clean recipes.js file for GitHub Pages.</p>
+    </div>
+    <div class="toolbar">
+      <button class="btn btn-primary" onclick="newRecipe()">+ New Recipe</button>
+      <button class="btn btn-soft" onclick="downloadDataFile()">Export recipes.js</button>
+    </div>
+  </section>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="recipes" onclick="setTab('recipes')">Recipes</button>
+    <button class="tab" data-tab="categories" onclick="setTab('categories')">Categories</button>
+    <button class="tab" data-tab="settings" onclick="setTab('settings')">Settings</button>
+    <button class="tab" data-tab="export" onclick="setTab('export')">Export</button>
+  </div>
+
+  <section class="workspace tab-panel" id="tab-recipes">
+    <aside class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">Recipes</div>
+          <div class="panel-sub" id="recipeCount">0 recipes</div>
+        </div>
+        <button class="btn btn-soft" onclick="newRecipe()">New</button>
+      </div>
+      <div class="list" id="recipeList"></div>
+    </aside>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">Recipe Editor</div>
+          <div class="panel-sub">Auto-sort by ingredients or choose manually.</div>
+        </div>
+        <button class="btn btn-danger" onclick="deleteSelectedRecipe()">Delete</button>
+      </div>
+      <div class="editor">
+        <div class="grid2">
+          <div class="field"><label>Recipe Name</label><input id="fTitle" placeholder="Example: Garlic steak salad"></div>
+          <div class="field"><label>Added By</label><input id="fAuthor" placeholder="Your name"></div>
+        </div>
+        <div class="grid3">
+          <div class="field"><label>Category Mode</label><select id="fCategoryMode"><option>Auto</option><option>Manual</option></select></div>
+          <div class="field"><label>Manual Category</label><select id="fCategory"></select></div>
+          <div class="field"><label>Meal Type</label><input id="fMealType" placeholder="Dinner"></div>
+        </div>
+        <div class="grid3">
+          <div class="field"><label>Time in Minutes</label><input id="fTime" type="number" min="1"></div>
+          <div class="field"><label>Servings</label><input id="fServings" type="number" min="1"></div>
+          <div class="field"><label>Rating</label><input id="fRating" type="number" min="1" max="5"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>Difficulty</label><select id="fDifficulty"><option>Easy</option><option>Medium</option><option>Hard</option></select></div>
+          <div class="field"><label>Tags</label><input id="fTags" placeholder="High Protein, Quick Meal"></div>
+        </div>
+        <div class="field"><label>Ingredients</label><textarea id="fIngredients" placeholder="Separate ingredients with commas"></textarea></div>
+        <div class="field"><label>Instructions</label><textarea id="fSteps" placeholder="Add each step on a new line"></textarea></div>
+        <div class="field"><label>Notes</label><textarea id="fNotes" placeholder="Substitutions, allergies, tips"></textarea></div>
+
+        <div class="preview-card" id="analysisPreview"></div>
+
+        <div class="toolbar">
+          <button class="btn btn-primary" onclick="saveRecipe()">Save Recipe</button>
+          <button class="btn btn-soft" onclick="duplicateSelectedRecipe()">Duplicate</button>
+          <button class="btn btn-soft" onclick="fillExampleRecipe()">Fill Example</button>
+        </div>
+      </div>
+    </section>
+  </section>
+
+  <section class="tab-panel hidden" id="tab-categories">
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">Categories</div>
+          <div class="panel-sub">Add or remove sections shown in the recipe library.</div>
+        </div>
+      </div>
+      <div class="editor">
+        <div class="grid3">
+          <div class="field"><label>Category Name</label><input id="cLabel" placeholder="Example: Lactose Free"></div>
+          <div class="field"><label>Icon</label><input id="cIcon" placeholder="🥛"></div>
+          <div class="field"><label>Description</label><input id="cDesc" placeholder="Short description"></div>
+        </div>
+        <button class="btn btn-primary" onclick="addCategory()">Add Category</button>
+        <div class="section-label">Current Categories</div>
+        <div class="category-grid" id="categoryManager"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="tab-panel hidden" id="tab-settings">
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">Site Settings</div>
+          <div class="panel-sub">Update the copy, passcode, and admin password.</div>
+        </div>
+      </div>
+      <div class="editor">
+        <div class="grid2">
+          <div class="field"><label>Site Name</label><input id="sSiteName"></div>
+          <div class="field"><label>Nav Label</label><input id="sNavLabel"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>Hero Eyebrow</label><input id="sEyebrow"></div>
+          <div class="field"><label>Hero Italic Line</label><input id="sHeroItalic"></div>
+        </div>
+        <div class="field"><label>Hero Title</label><input id="sHeroTitle"></div>
+        <div class="field"><label>Hero Description</label><textarea id="sHeroDescription"></textarea></div>
+        <div class="field"><label>Announcement Text</label><textarea id="sAnnouncementText"></textarea></div>
+        <div class="grid3">
+          <div class="field"><label>Access Code</label><input id="sAccessCode"></div>
+          <div class="field"><label>Admin Password</label><input id="sAdminPassword"></div>
+          <div class="field"><label>Require Access Code</label><select id="sRequireAccess"><option value="true">Yes</option><option value="false">No</option></select></div>
+        </div>
+        <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="tab-panel hidden" id="tab-export">
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">Export for GitHub</div>
+          <div class="panel-sub">Download the updated data file and replace recipes.js in your repo.</div>
+        </div>
+      </div>
+      <div class="editor">
+        <div class="export-box">
+          <div class="export-title">Your update workflow</div>
+          <p class="export-copy">The browser cannot directly edit files on GitHub Pages. Make your changes here, export recipes.js, then upload the new file to your GitHub repo.</p>
+          <button class="btn btn-primary" onclick="downloadDataFile()">Download recipes.js</button>
+          <button class="btn btn-soft" onclick="copyDataFile()">Copy File Text</button>
+        </div>
+        <div class="section-label">Preview</div>
+        <textarea class="jsonbox" id="exportPreview" spellcheck="false"></textarea>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast">Saved</div>
+<script src="recipes.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>

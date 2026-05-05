@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<title>MyCuisine · Private Recipe Club</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Geist:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="gate hidden" id="accessGate">
+  <div class="gate-card">
+    <img class="gate-emblem light-only" src="assets/mycuisine-emblem-light.svg" alt="MyCuisine">
+    <img class="gate-emblem dark-only" src="assets/mycuisine-emblem-dark.svg" alt="MyCuisine">
+    <div class="kicker">Private Recipe Club</div>
+    <h1 class="gate-title">Welcome to the table.</h1>
+    <p class="gate-copy">Enter the shared access code to open the friends-only recipe library. This is a light gate for a static GitHub site, not full authentication.</p>
+    <form id="gateForm">
+      <div class="field">
+        <label for="accessCode">Access Code</label>
+        <input id="accessCode" type="password" autocomplete="current-password" placeholder="Enter access code" />
+      </div>
+      <button class="btn btn-primary" type="submit" style="width:100%">Open MyCuisine</button>
+      <div class="error" id="gateError">Incorrect code. Try again.</div>
+    </form>
+  </div>
+</div>
+
+<nav>
+  <div class="nav-inner">
+    <a class="brand" href="index.html" aria-label="MyCuisine home">
+      <img class="emblem light-only" src="assets/mycuisine-emblem-light.svg" alt="">
+      <img class="emblem dark-only" src="assets/mycuisine-emblem-dark.svg" alt="">
+      <img class="wordmark light-only" src="assets/mycuisine-wordmark-light.svg" alt="MyCuisine">
+      <img class="wordmark dark-only" src="assets/mycuisine-wordmark-dark.svg" alt="MyCuisine">
+    </a>
+    <div class="nav-label" id="navLabel">Private Kitchen</div>
+    <div class="nav-right">
+      <button class="pill-toggle" type="button" onclick="toggleTheme()" aria-label="Toggle theme"><span id="lightPill">Light</span><span id="darkPill">Dark</span></button>
+      <a class="admin-link" href="admin.html">Admin</a>
+    </div>
+  </div>
+</nav>
+
+<main class="layout">
+  <section class="hero">
+    <div>
+      <div class="eyebrow" id="heroEyebrow">Friends-only recipe club</div>
+      <h1 class="hero-title"><span id="heroTitle">MyCuisine</span><br><em id="heroItalic">Private Table</em></h1>
+      <div class="hero-rule"></div>
+      <p class="hero-copy" id="heroDescription">A polished recipe library for friends and family to share meals, sort by ingredients, and protect dietary restrictions before anyone starts cooking.</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="#recipes">Browse Recipes</a>
+        <a class="btn btn-soft" href="#dietary">Dietary Guard</a>
+      </div>
+    </div>
+    <aside class="hero-card">
+      <div class="kicker">Today’s Kitchen</div>
+      <h2 class="hero-card-title">Cook smarter before anyone starts chopping.</h2>
+      <p class="hero-card-copy">Search recipes, review restriction warnings, save favorites, and build a shared grocery list from the same private dashboard.</p>
+      <div class="mini-stats">
+        <div class="mini-stat"><strong id="statRecipes">0</strong><span>Recipes</span></div>
+        <div class="mini-stat"><strong id="statSafe">0</strong><span>Safe Match</span></div>
+        <div class="mini-stat"><strong id="statFavorites">0</strong><span>Favorites</span></div>
+      </div>
+    </aside>
+  </section>
+
+  <div class="announce hidden" id="announcement">
+    <span id="announcementText"></span>
+    <button type="button" onclick="dismissAnnouncement()">Dismiss</button>
+  </div>
+
+  <section class="profile-panel" id="dietary">
+    <div class="profile-card">
+      <div class="kicker">Dietary Guard</div>
+      <h2 class="profile-title">Set restrictions before sorting recipes.</h2>
+      <p class="profile-copy">Select any dietary restrictions that matter for your group. The library will flag recipes that may contain those ingredients and the Safe Only filter will hide recipes that need review.</p>
+      <div class="chips" id="restrictionChips"></div>
+    </div>
+    <div class="profile-card">
+      <div class="kicker">Safety Review</div>
+      <h2 class="profile-title">Needs review</h2>
+      <p class="profile-copy">Recipes that may conflict with your current restriction profile.</p>
+      <div class="review-list" id="reviewList"></div>
+    </div>
+  </section>
+
+  <section class="section" id="recipes">
+    <div class="section-top">
+      <div class="section-kicker">Recipe Library</div>
+      <div class="section-note" id="resultNote">Showing all recipes</div>
+    </div>
+    <div class="toolbar-panel">
+      <div class="search-panel">
+        <span>⌕</span>
+        <input id="searchInput" type="search" placeholder="Search recipes, ingredients, tags, or friends..." autocomplete="off">
+        <span class="search-count" id="searchCount">0 results</span>
+        <button class="clear-btn" type="button" onclick="clearSearch()">Clear</button>
+      </div>
+      <div class="chips" id="categoryChips"></div>
+      <div class="chips" id="tagChips"></div>
+    </div>
+    <div class="recipe-grid" id="recipeGrid"></div>
+    <div class="empty hidden" id="emptyState">
+      <div class="empty-ico">🍽️</div>
+      <div class="empty-title">No recipes found</div>
+      <p>Try removing a filter or adding a recipe in the admin portal.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="footer-inner">
+    <div><span class="footer-brand">MyCuisine</span> · Private Recipe Club</div>
+    <div>Static GitHub build · Export updates from admin.html</div>
+  </div>
+</footer>
+
+<div class="modal" id="recipeModal">
+  <div class="modal-scrim" onclick="closeModal()"></div>
+  <div class="modal-panel">
+    <div class="modal-head">
+      <div>
+        <div class="modal-kicker" id="modalKicker">Recipe</div>
+        <div class="modal-title" id="modalTitle">Recipe Name</div>
+        <div class="modal-sub" id="modalSub">Recipe details</div>
+      </div>
+      <button class="close" onclick="closeModal()" aria-label="Close">×</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast">Saved</div>
+
+<script src="recipes.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
