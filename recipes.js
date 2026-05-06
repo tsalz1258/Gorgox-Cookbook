@@ -17,7 +17,7 @@ var SITE_CONFIG = {
   heroTitle: "Private Table",
   heroItalic: "for safe cooking",
   heroDescription: "A luxury recipe hub for friends, dietary safety, meal planning, pantry matching, grocery lists, and cook-this-tonight decisions.",
-  friendAccessCode: "kitchen2026",
+  friendAccessCode: "ok",
   adminPassword: "mycuisine2026",
   announcementActive: true,
   announcementText: "T.J.S profile is active. Recipes with milk, butter, cream, whey, casein, or hidden dairy wording will be flagged before cooking."
