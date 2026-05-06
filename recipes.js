@@ -10,7 +10,7 @@
    4. Replace this file in GitHub
 ═══════════════════════════════════════════════════════════════ */
 
-let SITE_CONFIG = {
+var SITE_CONFIG = {
   siteName: "MyCuisine",
   navLabel: "Private Table",
   heroEyebrow: "Friends-only private recipe room",
@@ -23,11 +23,11 @@ let SITE_CONFIG = {
   announcementText: "T.J.S profile is active. Recipes with milk, butter, cream, whey, casein, or hidden dairy wording will be flagged before cooking."
 };
 
-let CATEGORIES = [
+var CATEGORIES = [
   "Chicken", "Beef", "Turkey", "Seafood", "Salad", "Pasta", "Breakfast", "Dessert", "Snack", "Meal Prep", "Date Night", "Quick Meal", "Other"
 ];
 
-let FRIEND_PROFILES = [
+var FRIEND_PROFILES = [
   {
     id: "tjs",
     name: "T.J.S",
@@ -47,7 +47,7 @@ let FRIEND_PROFILES = [
   }
 ];
 
-let SUBSTITUTIONS = {
+var SUBSTITUTIONS = {
   "milk": ["lactose-free milk", "oat milk", "almond milk", "coconut milk"],
   "whole milk": ["lactose-free milk", "oat milk"],
   "butter": ["olive oil", "avocado oil", "dairy-free butter"],
@@ -72,13 +72,13 @@ let SUBSTITUTIONS = {
   "bacon": ["turkey bacon", "beef bacon", "crispy mushrooms"]
 };
 
-let COLLECTIONS = [
+var COLLECTIONS = [
   { id: "tjs-safe", label: "T.J.S Safe", desc: "Recipes that pass the T.J.S dairy safety check.", recipeIds: ["steakhouse-salad", "turkey-rice-bowls"] },
   { id: "weeknight", label: "Weeknight Winners", desc: "Fast meals for normal nights.", recipeIds: ["turkey-rice-bowls", "lemon-garlic-salmon"] },
   { id: "date-night", label: "Date Night", desc: "Cleaner, elevated recipes for a nicer dinner.", recipeIds: ["steakhouse-salad", "lemon-garlic-salmon"] }
 ];
 
-let RECIPES = [
+var RECIPES = [
   {
     id: "lactose-free-chicken-alfredo",
     status: "approved",
@@ -207,7 +207,7 @@ let RECIPES = [
   }
 ];
 
-let MEAL_PLANNER = {
+var MEAL_PLANNER = {
   Monday: "turkey-rice-bowls",
   Tuesday: "steakhouse-salad",
   Wednesday: "lactose-free-chicken-alfredo",
@@ -216,3 +216,45 @@ let MEAL_PLANNER = {
   Saturday: "",
   Sunday: ""
 };
+
+/* ═══════════════════════════════════════════════════════════════
+   Browser Fix / GitHub Pages Compatibility
+   ───────────────────────────────────────────────────────────────
+   This makes the data visible to app.js and admin.js and repairs
+   old cached localStorage data where the access code was missing.
+═══════════════════════════════════════════════════════════════ */
+(function () {
+  window.SITE_CONFIG = SITE_CONFIG;
+  window.CATEGORIES = CATEGORIES;
+  window.FRIEND_PROFILES = FRIEND_PROFILES;
+  window.SUBSTITUTIONS = SUBSTITUTIONS;
+  window.COLLECTIONS = COLLECTIONS;
+  window.RECIPES = RECIPES;
+  window.MEAL_PLANNER = MEAL_PLANNER;
+
+  try {
+    var storeKey = "mycuisine.privateTable.v4";
+    var saved = localStorage.getItem(storeKey);
+
+    if (saved) {
+      var data = JSON.parse(saved);
+      data.config = data.config || {};
+
+      // Force the correct gate credentials into the saved browser data.
+      data.config.friendAccessCode = SITE_CONFIG.friendAccessCode;
+      data.config.adminPassword = SITE_CONFIG.adminPassword;
+
+      // If older saved data is missing core sections, restore them.
+      if (!Array.isArray(data.categories) || data.categories.length === 0) data.categories = CATEGORIES;
+      if (!Array.isArray(data.profiles) || data.profiles.length === 0) data.profiles = FRIEND_PROFILES;
+      if (!Array.isArray(data.recipes) || data.recipes.length === 0) data.recipes = RECIPES;
+      if (!Array.isArray(data.collections) || data.collections.length === 0) data.collections = COLLECTIONS;
+      if (!data.substitutions || Object.keys(data.substitutions).length === 0) data.substitutions = SUBSTITUTIONS;
+      if (!data.planner || Object.keys(data.planner).length === 0) data.planner = MEAL_PLANNER;
+
+      localStorage.setItem(storeKey, JSON.stringify(data));
+    }
+  } catch (error) {
+    console.warn("MyCuisine saved-data repair skipped:", error);
+  }
+})();
