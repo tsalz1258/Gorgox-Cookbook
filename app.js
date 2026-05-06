@@ -1,290 +1,355 @@
-/* MyCuisine public recipe library */
-const LS = {
-  theme: "mycuisine-theme",
-  access: "mycuisine-access-ok",
-  favorites: "mycuisine-favorites",
-  restrictions: "mycuisine-active-restrictions",
-  announce: "mycuisine-announcement-dismissed"
-};
+let data = loadData();
+let selectedProfileIds = [data.profiles?.[0]?.id].filter(Boolean);
+let selectedCategory = "All";
+let selectedCollection = "All";
+let selectedRecipeId = null;
+let cookSteps = [];
+let cookIndex = 0;
+let groceryItems = [];
+let planner = JSON.parse(localStorage.getItem(MC_PLAN_KEY) || "null") || data.planner || {};
+let pantryItems = splitList(localStorage.getItem(MC_PANTRY_KEY) || "");
 
-let activeCategory = "All";
-let activeTag = "All";
-let safeOnly = false;
-let favoritesOnly = false;
-let searchTerm = "";
-let activeRestrictions = loadJSON(LS.restrictions, ["dairy"]);
-let favorites = loadJSON(LS.favorites, []);
+const qs = (sel) => document.querySelector(sel);
+const qsa = (sel) => [...document.querySelectorAll(sel)];
 
-function $(id){ return document.getElementById(id); }
-function loadJSON(key, fallback){ try{ const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }catch{ return fallback; } }
-function saveJSON(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
-function normalize(value){ return String(value || "").toLowerCase(); }
-function arrayText(items){ return Array.isArray(items) ? items.join(" ") : String(items || ""); }
-function slug(value){ return normalize(value).replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"") || `recipe-${Date.now()}`; }
-function unique(items){ return [...new Set(items.filter(Boolean))]; }
-
-function setTheme(theme){
-  document.documentElement.setAttribute("data-theme", theme);
-  localStorage.setItem(LS.theme, theme);
-  updateThemePills();
-}
-function toggleTheme(){ setTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark"); }
-function updateThemePills(){
-  const theme = document.documentElement.getAttribute("data-theme");
-  if($("lightPill")) $("lightPill").classList.toggle("on", theme === "light");
-  if($("darkPill")) $("darkPill").classList.toggle("on", theme === "dark");
+function boot(){
+  initTheme();
+  setupGate();
+  setupNav();
+  renderAnnouncement();
+  renderStats();
+  renderProfileChips();
+  renderCategoryChips();
+  renderCollectionChips();
+  renderRecipes();
+  renderPlanner();
+  renderProfiles();
+  renderCollections();
+  renderGrocery();
+  renderPantry();
+  setupEvents();
 }
 
-function setupAccessGate(){
-  if(!SITE_CONFIG.requireAccessCode) return;
-  if(localStorage.getItem(LS.access) === "true") return;
-  const gate = $("accessGate");
-  if(gate) gate.classList.remove("hidden");
-  $("gateForm")?.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const entered = $("accessCode").value.trim();
-    if(entered === SITE_CONFIG.accessCode){
-      localStorage.setItem(LS.access, "true");
+document.addEventListener("DOMContentLoaded", boot);
+
+function setupGate(){
+  const gate = qs("#gate");
+  if(localStorage.getItem(MC_GATE_KEY)==="ok") gate?.classList.add("hidden");
+  qs("#gateForm")?.addEventListener("submit", e => {
+    e.preventDefault();
+    const code = qs("#accessCode").value.trim();
+    if(code === data.config.friendAccessCode){
+      localStorage.setItem(MC_GATE_KEY,"ok");
       gate.classList.add("hidden");
-      toast("Welcome in");
-    }else{
-      $("gateError").classList.add("show");
+    } else {
+      qs("#gateError").classList.add("show");
     }
   });
 }
 
-function applyConfig(){
-  document.title = `${SITE_CONFIG.siteName} · Private Recipe Club`;
-  $("navLabel").textContent = SITE_CONFIG.navLabel;
-  $("heroEyebrow").textContent = SITE_CONFIG.eyebrow;
-  $("heroTitle").textContent = SITE_CONFIG.heroTitle;
-  $("heroItalic").textContent = SITE_CONFIG.heroItalic;
-  $("heroDescription").textContent = SITE_CONFIG.heroDescription;
-  if(SITE_CONFIG.announcementActive && localStorage.getItem(LS.announce) !== "true"){
-    $("announcementText").textContent = SITE_CONFIG.announcementText;
-    $("announcement").classList.remove("hidden");
+function setupNav(){
+  qsa("[data-theme]").forEach(btn => btn.addEventListener("click", () => applyTheme(btn.dataset.theme)));
+  document.addEventListener("keydown", e => {
+    const isMac = navigator.platform.toUpperCase().includes("MAC");
+    if((isMac && e.metaKey && e.altKey && e.key.toLowerCase()==="a") || (!isMac && e.ctrlKey && e.altKey && e.key.toLowerCase()==="a")){
+      location.href = "admin.html";
+    }
+  });
+  qsa(".tab").forEach(tab => tab.addEventListener("click", () => switchView(tab.dataset.view)));
+}
+
+function setupEvents(){
+  qs("#searchInput")?.addEventListener("input", renderRecipes);
+  qs("#safeOnly")?.addEventListener("click", () => { qs("#safeOnly").classList.toggle("active"); renderRecipes(); });
+  qs("#resetFilters")?.addEventListener("click", resetFilters);
+  qs("#autoPlan")?.addEventListener("click", autoFillPlanner);
+  qs("#clearPlan")?.addEventListener("click", clearPlanner);
+  qs("#copyGrocery")?.addEventListener("click", copyGrocery);
+  qs("#clearGrocery")?.addEventListener("click", () => { groceryItems=[]; localStorage.setItem(MC_GROCERY_KEY,"[]"); renderGrocery(); });
+  qs("#pantryInput")?.addEventListener("input", e => { pantryItems=splitList(e.target.value); localStorage.setItem(MC_PANTRY_KEY, e.target.value); renderRecipes(); });
+  qs("#cookTonight")?.addEventListener("click", cookThisTonight);
+  qs("#modalClose")?.addEventListener("click", closeModal);
+  qs("#modalScrim")?.addEventListener("click", closeModal);
+  qs("#addModalGrocery")?.addEventListener("click", addSelectedRecipeToGrocery);
+  qs("#copyModalRecipe")?.addEventListener("click", copySelectedRecipe);
+  qs("#startCookMode")?.addEventListener("click", startCookMode);
+  qs("#cookClose")?.addEventListener("click", stopCookMode);
+  qs("#cookNext")?.addEventListener("click", () => moveCookStep(1));
+  qs("#cookPrev")?.addEventListener("click", () => moveCookStep(-1));
+  qs("#copyCurrentPlan")?.addEventListener("click", copyPlan);
+}
+
+function switchView(view){
+  qsa(".tab").forEach(t=>t.classList.toggle("active", t.dataset.view===view));
+  qsa(".view").forEach(v=>v.classList.toggle("active", v.id===`view-${view}`));
+}
+
+function renderAnnouncement(){
+  const el = qs("#announcement");
+  if(!el) return;
+  if(data.config.announcementActive){
+    el.classList.add("show");
+    el.querySelector("span").textContent = data.config.announcementText;
+    el.querySelector("button").onclick = () => el.classList.remove("show");
   }
 }
 
-function dismissAnnouncement(){
-  localStorage.setItem(LS.announce, "true");
-  $("announcement").classList.add("hidden");
+function currentProfiles(){ return getSelectedProfiles(data, selectedProfileIds); }
+function profileNames(){ return currentProfiles().map(p=>p.shortName||p.name).join(" + ") || "profiles"; }
+
+function renderStats(){
+  const approved = getApprovedRecipes(data);
+  const safe = approved.filter(r => analyzeRecipeForProfiles(r,currentProfiles(),data).level === "safe").length;
+  qs("#statRecipes").textContent = approved.length;
+  qs("#statSafe").textContent = safe;
+  qs("#statProfiles").textContent = data.profiles.length;
+  qs("#statPlanner").textContent = Object.values(planner).filter(Boolean).length;
 }
 
-function getConflicts(recipe){
-  const text = normalize(`${recipe.title} ${arrayText(recipe.ingredients)} ${arrayText(recipe.tags)} ${arrayText(recipe.steps)}`);
-  const conflicts = [];
-  activeRestrictions.forEach((id) => {
-    const rule = RESTRICTIONS.find((item) => item.id === id);
-    if(rule && rule.keywords.some((keyword) => text.includes(keyword.toLowerCase()))){
-      conflicts.push(rule.warning);
-    }
-  });
-  return unique(conflicts);
-}
-
-function getAllTags(){
-  return unique(RECIPES.flatMap((recipe) => recipe.tags || [])).sort();
-}
-
-function matchesRecipe(recipe){
-  const haystack = normalize([recipe.title, recipe.author, recipe.category, recipe.mealType, arrayText(recipe.tags), arrayText(recipe.ingredients), arrayText(recipe.steps), recipe.notes].join(" "));
-  const conflicts = getConflicts(recipe);
-  if(activeCategory !== "All" && recipe.category !== activeCategory) return false;
-  if(activeTag !== "All" && !(recipe.tags || []).includes(activeTag)) return false;
-  if(favoritesOnly && !favorites.includes(recipe.id)) return false;
-  if(safeOnly && conflicts.length > 0) return false;
-  if(searchTerm && !haystack.includes(searchTerm)) return false;
-  return true;
-}
-
-function renderRestrictionChips(){
-  const host = $("restrictionChips");
-  host.innerHTML = "";
-  RESTRICTIONS.forEach((restriction) => {
-    const btn = document.createElement("button");
-    btn.className = `chip safe ${activeRestrictions.includes(restriction.id) ? "active" : ""}`;
-    btn.textContent = restriction.label;
-    btn.onclick = () => {
-      activeRestrictions = activeRestrictions.includes(restriction.id)
-        ? activeRestrictions.filter((id) => id !== restriction.id)
-        : [...activeRestrictions, restriction.id];
-      saveJSON(LS.restrictions, activeRestrictions);
-      renderAll();
-    };
-    host.appendChild(btn);
-  });
+function renderProfileChips(){
+  const wrap = qs("#profileChips");
+  if(!wrap) return;
+  wrap.innerHTML = data.profiles.map(profile => `<button class="profile-chip ${selectedProfileIds.includes(profile.id)?"active":""}" data-profile="${profile.id}">${escapeHtml(profile.shortName||profile.name)}</button>`).join("");
+  wrap.querySelectorAll("button").forEach(btn => btn.addEventListener("click", () => {
+    const id = btn.dataset.profile;
+    if(selectedProfileIds.includes(id)) selectedProfileIds = selectedProfileIds.filter(x=>x!==id);
+    else selectedProfileIds.push(id);
+    if(selectedProfileIds.length===0) selectedProfileIds=[id];
+    renderProfileChips(); renderStats(); renderRecipes(); renderPlanner(); renderGrocery();
+  }));
 }
 
 function renderCategoryChips(){
-  const host = $("categoryChips");
-  host.innerHTML = "";
-  const all = [{ label:"All", icon:"◎" }, ...CATEGORIES];
-  all.forEach((cat) => {
-    const btn = document.createElement("button");
-    btn.className = `chip ${activeCategory === cat.label ? "active" : ""}`;
-    btn.textContent = `${cat.icon || "•"} ${cat.label}`;
-    btn.onclick = () => { activeCategory = cat.label; renderAll(); };
-    host.appendChild(btn);
-  });
+  const wrap = qs("#categoryChips");
+  if(!wrap) return;
+  wrap.innerHTML = ["All", ...data.categories].map(cat => `<button class="chip ${selectedCategory===cat?"active":""}" data-cat="${escapeHtml(cat)}">${escapeHtml(cat)}</button>`).join("");
+  wrap.querySelectorAll("button").forEach(btn => btn.addEventListener("click", () => { selectedCategory = btn.dataset.cat; renderCategoryChips(); renderRecipes(); }));
 }
 
-function renderTagChips(){
-  const host = $("tagChips");
-  host.innerHTML = "";
-  const tagButtons = ["All", "Safe Only", "Favorites", ...getAllTags()];
-  tagButtons.forEach((tag) => {
-    const btn = document.createElement("button");
-    const isActive = tag === "Safe Only" ? safeOnly : tag === "Favorites" ? favoritesOnly : activeTag === tag;
-    btn.className = `chip ${tag === "Safe Only" ? "safe" : ""} ${tag === "Favorites" ? "danger" : ""} ${isActive ? "active" : ""}`;
-    btn.textContent = tag === "Favorites" ? `★ ${tag}` : tag;
-    btn.onclick = () => {
-      if(tag === "Safe Only") safeOnly = !safeOnly;
-      else if(tag === "Favorites") favoritesOnly = !favoritesOnly;
-      else activeTag = tag;
-      renderAll();
-    };
-    host.appendChild(btn);
-  });
+function renderCollectionChips(){
+  const wrap = qs("#collectionChips");
+  if(!wrap) return;
+  const labels = ["All", "Favorites", ...(data.collections||[]).map(c=>c.label)];
+  wrap.innerHTML = labels.map(label => `<button class="chip ${selectedCollection===label?"active":""}" data-col="${escapeHtml(label)}">${escapeHtml(label)}</button>`).join("");
+  wrap.querySelectorAll("button").forEach(btn => btn.addEventListener("click", () => { selectedCollection = btn.dataset.col; renderCollectionChips(); renderRecipes(); }));
 }
 
-function renderCards(){
-  const grid = $("recipeGrid");
-  const recipes = RECIPES.filter(matchesRecipe);
-  grid.innerHTML = "";
-  $("emptyState").classList.toggle("hidden", recipes.length > 0);
-  $("searchCount").textContent = `${recipes.length} result${recipes.length === 1 ? "" : "s"}`;
-  $("resultNote").textContent = recipes.length === RECIPES.length ? "Showing all recipes" : `Showing ${recipes.length} filtered recipe${recipes.length === 1 ? "" : "s"}`;
+function renderRecipes(){
+  const grid = qs("#recipeGrid");
+  if(!grid) return;
+  const query = normalize(qs("#searchInput")?.value || "");
+  const safeOnly = qs("#safeOnly")?.classList.contains("active");
+  const profiles = currentProfiles();
+  let recipes = getApprovedRecipes(data);
 
-  recipes.forEach((recipe) => {
-    const conflicts = getConflicts(recipe);
-    const card = document.createElement("article");
-    card.className = "recipe-card";
-    card.onclick = () => openRecipe(recipe.id);
-    card.innerHTML = `
-      <div class="recipe-top">
-        <div class="recipe-meta">
-          <div class="recipe-type">${escapeHTML(recipe.category)} · ${escapeHTML(recipe.mealType || "Meal")}</div>
-          <button class="fav-btn ${favorites.includes(recipe.id) ? "active" : ""}" onclick="event.stopPropagation();toggleFavorite('${recipe.id}')" title="Favorite">★</button>
-        </div>
-        <h3 class="recipe-title">${escapeHTML(recipe.title)}</h3>
-      </div>
-      <div class="recipe-body">
-        <div class="recipe-facts">
-          <div class="fact"><strong>${Number(recipe.time || 0)}</strong> min</div>
-          <div class="fact"><strong>${Number(recipe.servings || 0)}</strong> servings</div>
-          <div class="fact"><strong>${Number(recipe.rating || 0)}/5</strong> rating</div>
-        </div>
-        <div class="tag-row">
-          ${conflicts.length ? `<span class="tag warn">⚠ Review</span>` : `<span class="tag good">✓ Safe match</span>`}
-          ${(recipe.tags || []).slice(0,4).map((tag) => `<span class="tag">${escapeHTML(tag)}</span>`).join("")}
-        </div>
-        <p class="recipe-desc">${escapeHTML(Array.isArray(recipe.steps) ? recipe.steps.join(" ") : recipe.steps || "")}</p>
-        <div class="ingredient-cloud">
-          ${(recipe.ingredients || []).slice(0,7).map((item) => `<span class="ingredient">${escapeHTML(item)}</span>`).join("")}
-        </div>
-        <div class="card-foot"><span>By ${escapeHTML(recipe.author || "Friend")}</span><span class="arrow">↗</span></div>
-      </div>`;
-    grid.appendChild(card);
+  recipes = recipes.filter(recipe => {
+    const text = normalize(`${recipe.title} ${recipe.category} ${recipe.mealType} ${(recipe.tags||[]).join(" ")} ${(recipe.ingredients||[]).join(" ")} ${recipe.notes||""}`);
+    const analysis = analyzeRecipeForProfiles(recipe, profiles, data);
+    const inCategory = selectedCategory === "All" || recipe.category === selectedCategory;
+    const inSearch = !query || text.includes(query);
+    const safeMatch = !safeOnly || analysis.level === "safe";
+    let inCollection = true;
+    if(selectedCollection === "Favorites") inCollection = (recipe.favorites||[]).length > 0;
+    else if(selectedCollection !== "All"){
+      const collection = (data.collections||[]).find(c=>c.label===selectedCollection);
+      inCollection = collection ? (collection.recipeIds||[]).includes(recipe.id) : true;
+    }
+    return inCategory && inSearch && safeMatch && inCollection;
   });
-}
 
-function renderReviewList(){
-  const host = $("reviewList");
-  const items = RECIPES.map((recipe) => ({ recipe, conflicts:getConflicts(recipe) })).filter((item) => item.conflicts.length > 0);
-  if(!items.length){
-    host.innerHTML = `<div class="review-item" style="border-color:rgba(22,128,60,.22);background:rgba(22,128,60,.08)"><div class="review-title">✓ No conflicts found</div><div class="review-reason">No recipes conflict with the current restriction profile.</div></div>`;
+  recipes.sort((a,b) => {
+    const aa = analyzeRecipeForProfiles(a, profiles, data);
+    const bb = analyzeRecipeForProfiles(b, profiles, data);
+    return bb.score - aa.score;
+  });
+
+  if(!recipes.length){
+    grid.innerHTML = `<div class="empty" style="grid-column:1/-1">No recipes found. Try removing a filter or adding one through the admin portal.</div>`;
+    qs("#resultCount").textContent = "0 recipes";
     return;
   }
-  host.innerHTML = items.slice(0,5).map(({recipe, conflicts}) => `
-    <div class="review-item">
-      <div class="review-title">${escapeHTML(recipe.title)}</div>
-      <div class="review-reason">${conflicts.map(escapeHTML).join(" · ")}</div>
-    </div>`).join("");
+  qs("#resultCount").textContent = `${recipes.length} recipe${recipes.length===1?"":"s"}`;
+  grid.innerHTML = recipes.map(recipeCardHtml).join("");
+  grid.querySelectorAll(".recipe-card").forEach(card => card.addEventListener("click", e => {
+    if(e.target.closest(".favorite")) return;
+    openRecipe(card.dataset.id);
+  }));
+  grid.querySelectorAll(".favorite").forEach(btn => btn.addEventListener("click", e => {
+    e.stopPropagation();
+    const id = btn.dataset.id;
+    const recipe = getRecipe(data,id);
+    recipe.favorites = recipe.favorites || [];
+    if(recipe.favorites.includes("tjs-safe")) recipe.favorites = recipe.favorites.filter(x=>x!=="tjs-safe");
+    else recipe.favorites.push("tjs-safe");
+    saveData(data); renderRecipes(); renderCollections();
+  }));
 }
 
-function renderStats(){
-  const safe = RECIPES.filter((recipe) => getConflicts(recipe).length === 0).length;
-  $("statRecipes").textContent = RECIPES.length;
-  $("statSafe").textContent = safe;
-  $("statFavorites").textContent = favorites.length;
+function recipeCardHtml(recipe){
+  const profiles = currentProfiles();
+  const analysis = analyzeRecipeForProfiles(recipe, profiles, data);
+  const label = getSafetyLabel(analysis, profileNames());
+  const pantry = getPantryMatch(recipe, pantryItems);
+  const img = recipe.imageUrl ? `<img src="${escapeHtml(recipe.imageUrl)}" alt="${escapeHtml(recipe.title)}">` : `<div class="photo-fallback">${escapeHtml(getInitials(recipe.title))}</div>`;
+  const tags = (recipe.tags||[]).slice(0,5).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join("");
+  return `<article class="recipe-card" data-id="${recipe.id}">
+    <div class="photo">${img}<span class="status-pill ${label.cls}">${escapeHtml(label.text)}</span><button class="favorite ${(recipe.favorites||[]).includes("tjs-safe")?"on":""}" data-id="${recipe.id}" title="Favorite">★</button></div>
+    <div class="recipe-body">
+      <div class="recipe-type">${escapeHtml(recipe.category)} • ${escapeHtml(recipe.mealType)} • ${escapeHtml(recipe.difficulty)}</div>
+      <h3 class="recipe-title">${escapeHtml(recipe.title)}</h3>
+      <p class="recipe-desc">${escapeHtml(recipe.notes || "Open the recipe to review ingredients, substitutions, and cooking steps.")}</p>
+      <div class="metrics">
+        <div class="metric"><strong>${Number(recipe.time||0)}</strong><span>Min</span></div>
+        <div class="metric"><strong>${Number(recipe.servings||0)}</strong><span>Serv</span></div>
+        <div class="metric"><strong>${analysis.score}</strong><span>Score</span></div>
+        <div class="metric"><strong>${pantry.count}/${pantry.total}</strong><span>Pantry</span></div>
+      </div>
+      <div class="tag-row">${tags}</div>
+      <div class="score-row"><span class="score"><strong>${analysis.level === "safe" ? "Ready" : analysis.level === "warning" ? "Review" : "Blocked"}</strong> for ${escapeHtml(profileNames())}</span><span class="arrow">↗</span></div>
+    </div>
+  </article>`;
 }
 
-function renderAll(){
-  renderRestrictionChips();
-  renderCategoryChips();
-  renderTagChips();
-  renderCards();
-  renderReviewList();
-  renderStats();
-}
-
-function toggleFavorite(id){
-  favorites = favorites.includes(id) ? favorites.filter((item) => item !== id) : [...favorites, id];
-  saveJSON(LS.favorites, favorites);
-  renderAll();
+function resetFilters(){
+  qs("#searchInput").value = "";
+  selectedCategory = "All";
+  selectedCollection = "All";
+  qs("#safeOnly")?.classList.remove("active");
+  renderCategoryChips(); renderCollectionChips(); renderRecipes();
 }
 
 function openRecipe(id){
-  const recipe = RECIPES.find((item) => item.id === id);
+  selectedRecipeId = id;
+  const recipe = getRecipe(data,id);
   if(!recipe) return;
-  const conflicts = getConflicts(recipe);
-  $("modalKicker").textContent = `${recipe.category} · ${recipe.mealType || "Meal"}`;
-  $("modalTitle").textContent = recipe.title;
-  $("modalSub").textContent = `${recipe.time} minutes · ${recipe.servings} servings · ${recipe.difficulty || "Easy"} · Added by ${recipe.author || "Friend"}`;
-  const steps = Array.isArray(recipe.steps) ? recipe.steps : String(recipe.steps || "").split(/\n+/).filter(Boolean);
-  $("modalBody").innerHTML = `
-    <div class="tag-row" style="margin-bottom:18px">
-      ${conflicts.length ? `<span class="tag warn">⚠ ${conflicts.map(escapeHTML).join(" · ")}</span>` : `<span class="tag good">✓ Safe for selected restrictions</span>`}
-      ${(recipe.tags || []).map((tag) => `<span class="tag">${escapeHTML(tag)}</span>`).join("")}
-    </div>
-    <div class="recipe-detail-grid">
-      <div class="detail-box">
-        <div class="detail-label">Ingredients</div>
-        <ul>${(recipe.ingredients || []).map((item) => `<li>${escapeHTML(item)}</li>`).join("")}</ul>
-      </div>
-      <div class="detail-box">
-        <div class="detail-label">Instructions</div>
-        <ol>${steps.map((step) => `<li>${escapeHTML(step)}</li>`).join("")}</ol>
-      </div>
-      <div class="detail-box">
-        <div class="detail-label">Notes</div>
-        <p>${escapeHTML(recipe.notes || "No extra notes yet.")}</p>
-      </div>
-      <div class="detail-box">
-        <div class="detail-label">Quick Actions</div>
-        <div class="toolbar" style="margin-top:0">
-          <button class="btn btn-primary" onclick="copyIngredients('${recipe.id}')">Copy Ingredients</button>
-          <button class="btn btn-soft" onclick="toggleFavorite('${recipe.id}')">${favorites.includes(recipe.id) ? "Remove Favorite" : "Save Favorite"}</button>
-        </div>
-      </div>
-    </div>`;
-  $("recipeModal").classList.add("open");
+  const analysis = analyzeRecipeForProfiles(recipe,currentProfiles(),data);
+  const label = getSafetyLabel(analysis, profileNames());
+  qs("#modalTitle").textContent = recipe.title;
+  qs("#modalSub").textContent = `${recipe.category} • ${recipe.mealType} • ${recipe.time} minutes • ${recipe.servings} servings`;
+  qs("#modalBody").innerHTML = recipeDetailHtml(recipe,analysis,label);
+  qs("#recipeModal").classList.add("open");
 }
-function closeModal(){ $("recipeModal").classList.remove("open"); }
+function closeModal(){qs("#recipeModal")?.classList.remove("open");}
 
-function copyIngredients(id){
-  const recipe = RECIPES.find((item) => item.id === id);
-  if(!recipe) return;
-  const text = `${recipe.title}\n\nIngredients:\n${(recipe.ingredients || []).map((item) => `- ${item}`).join("\n")}`;
-  navigator.clipboard?.writeText(text).then(() => toast("Ingredients copied"));
+function recipeDetailHtml(recipe,analysis,label){
+  const warnings = [...analysis.blocked.map(x=>x.message), ...analysis.caution.map(x=>x.message)];
+  const warningHtml = warnings.length ? `<div class="warning-box"><strong>${escapeHtml(label.text)}</strong><ul class="ingredient-list">${warnings.map(w=>`<li>${escapeHtml(w)}</li>`).join("")}</ul></div>` : `<div class="safe-box"><strong>${escapeHtml(label.text)}</strong><p class="muted" style="margin-top:6px">No blocked or warning ingredients were detected for the selected profile(s).</p></div>`;
+  const swaps = analysis.swaps.length ? analysis.swaps.map(s=>`<li><strong>${escapeHtml(s.ingredient)}</strong>: ${escapeHtml(s.choices.join(", "))}</li>`).join("") : `<li>No substitution needed based on selected profiles.</li>`;
+  const nutrition = recipe.nutrition || {};
+  const versions = (recipe.versions||[]).length ? recipe.versions.map(v=>`<li><strong>${escapeHtml(v.label)}</strong>: ${escapeHtml(v.notes)}</li>`).join("") : `<li>No alternate versions yet.</li>`;
+  return `<div class="detail-grid">
+    <section class="detail-section"><h4>Safety Review</h4>${warningHtml}<h4>Suggested Swaps</h4><ul class="ingredient-list">${swaps}</ul></section>
+    <section class="detail-section"><h4>Nutrition Estimate</h4><div class="metrics"><div class="metric"><strong>${nutrition.calories||"—"}</strong><span>Cal</span></div><div class="metric"><strong>${nutrition.protein||"—"}</strong><span>Protein</span></div><div class="metric"><strong>${nutrition.carbs||"—"}</strong><span>Carbs</span></div><div class="metric"><strong>${nutrition.fat||"—"}</strong><span>Fat</span></div></div><p class="muted" style="font-size:12px;margin-top:10px">Nutrition values are estimates and should be verified if needed.</p></section>
+    <section class="detail-section"><h4>Ingredients</h4><ul class="ingredient-list">${(recipe.ingredients||[]).map(i=>`<li>${escapeHtml(i)}</li>`).join("")}</ul></section>
+    <section class="detail-section"><h4>Steps</h4><ol class="step-list">${(recipe.steps||[]).map(s=>`<li>${escapeHtml(s)}</li>`).join("")}</ol></section>
+    <section class="detail-section"><h4>Recipe Versions</h4><ul class="ingredient-list">${versions}</ul></section>
+    <section class="detail-section"><h4>Notes</h4><p class="muted" style="line-height:1.7">${escapeHtml(recipe.notes||"No notes yet.")}</p></section>
+  </div>`;
 }
 
-function clearSearch(){ $("searchInput").value = ""; searchTerm = ""; renderAll(); }
-function toast(message){ const el = $("toast"); el.textContent = message; el.classList.add("show"); setTimeout(() => el.classList.remove("show"), 1800); }
-function escapeHTML(value){ return String(value ?? "").replace(/[&<>'"]/g, (char) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[char])); }
+function addSelectedRecipeToGrocery(){
+  if(!selectedRecipeId) return;
+  if(!groceryItems.includes(selectedRecipeId)) groceryItems.push(selectedRecipeId);
+  localStorage.setItem(MC_GROCERY_KEY, JSON.stringify(groceryItems));
+  renderGrocery();
+  toast("Recipe added to grocery list");
+}
+function copySelectedRecipe(){
+  const recipe = getRecipe(data,selectedRecipeId);
+  if(!recipe) return;
+  copyText(formatRecipeForCopy(recipe)).then(()=>toast("Recipe copied"));
+}
 
-window.addEventListener("keydown", (event) => {
-  const macCombo = event.metaKey && event.altKey && event.key.toLowerCase() === "a";
-  const winCombo = event.ctrlKey && event.altKey && event.key.toLowerCase() === "a";
-  if(macCombo || winCombo){ window.location.href = "admin.html"; }
-  if(event.key === "Escape") closeModal();
-});
+function renderPlanner(){
+  const wrap = qs("#plannerGrid");
+  if(!wrap) return;
+  const days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+  const options = [`<option value="">Choose recipe</option>`, ...getApprovedRecipes(data).map(r=>`<option value="${r.id}">${escapeHtml(r.title)}</option>`)].join("");
+  wrap.innerHTML = days.map(day => {
+    const recipe = getRecipe(data, planner[day]);
+    const analysis = recipe ? analyzeRecipeForProfiles(recipe,currentProfiles(),data) : null;
+    const label = analysis ? getSafetyLabel(analysis, profileNames()) : null;
+    return `<div class="plan-card"><div class="plan-day">${day}</div><select class="plan-select" data-day="${day}">${options}</select>${recipe ? `<h3 class="plan-title">${escapeHtml(recipe.title)}</h3><span class="flag ${label.cls.replace("status","flag")}">${escapeHtml(label.text)}</span><p class="muted" style="font-size:12px;line-height:1.6;margin-top:10px">${recipe.time} min • ${recipe.servings} servings</p>` : `<p class="muted" style="font-size:13px;line-height:1.6">No recipe selected.</p>`}</div>`;
+  }).join("");
+  wrap.querySelectorAll("select").forEach(sel => {
+    sel.value = planner[sel.dataset.day] || "";
+    sel.addEventListener("change", () => { planner[sel.dataset.day]=sel.value; localStorage.setItem(MC_PLAN_KEY, JSON.stringify(planner)); data.planner=planner; renderPlanner(); renderStats(); });
+  });
+}
+function autoFillPlanner(){
+  const maxTime = Number(qs("#plannerTime")?.value || 45);
+  planner = autoPlanWeek(data, selectedProfileIds, pantryItems, maxTime);
+  localStorage.setItem(MC_PLAN_KEY, JSON.stringify(planner));
+  data.planner=planner;
+  renderPlanner(); renderStats(); renderGrocery(); toast("Week planned");
+}
+function clearPlanner(){planner={Monday:"",Tuesday:"",Wednesday:"",Thursday:"",Friday:"",Saturday:"",Sunday:""}; localStorage.setItem(MC_PLAN_KEY, JSON.stringify(planner)); data.planner=planner; renderPlanner(); renderStats();}
+function copyPlan(){
+  const text = Object.entries(planner).map(([day,id]) => `${day}: ${getRecipe(data,id)?.title || "—"}`).join("\n");
+  copyText(text).then(()=>toast("Meal plan copied"));
+}
 
-window.addEventListener("DOMContentLoaded", () => {
-  setTheme(localStorage.getItem(LS.theme) || document.documentElement.getAttribute("data-theme") || "light");
-  applyConfig();
-  setupAccessGate();
-  $("searchInput").addEventListener("input", (event) => { searchTerm = normalize(event.target.value); renderAll(); });
-  renderAll();
-});
+function renderGrocery(){
+  try{groceryItems = JSON.parse(localStorage.getItem(MC_GROCERY_KEY)||"[]");}catch{groceryItems=[];}
+  const plannedIds = Object.values(planner).filter(Boolean);
+  const allIds = unique([...groceryItems, ...plannedIds]);
+  const items = buildGroceryFromRecipeIds(data, allIds, currentProfiles());
+  const wrap = qs("#groceryList");
+  if(!wrap) return;
+  if(!items.length){wrap.innerHTML = `<div class="empty">No grocery items yet. Add a recipe or create a meal plan.</div>`; return;}
+  const sections = unique(items.map(i=>i.section));
+  wrap.innerHTML = sections.map(section => `<div class="grocery-section"><h4>${escapeHtml(section)}</h4>${items.filter(i=>i.section===section).map(i=>`<div class="grocery-item"><span>${escapeHtml(i.item)}</span><span>${i.flags.length ? `<span class="flag ${i.flags[0].includes("Blocked")?"flag-danger":"flag-warning"}">${escapeHtml(i.flags[0])}</span>` : `<span class="flag flag-safe">OK</span>`}</span></div>`).join("")}</div>`).join("");
+  qs("#grocerySummary").textContent = `${items.length} item${items.length===1?"":"s"} from planner and saved recipes.`;
+}
+function copyGrocery(){
+  const plannedIds = Object.values(planner).filter(Boolean);
+  const allIds = unique([...groceryItems, ...plannedIds]);
+  const items = buildGroceryFromRecipeIds(data, allIds, currentProfiles());
+  const sections = unique(items.map(i=>i.section));
+  const text = sections.map(section => `${section}\n${items.filter(i=>i.section===section).map(i=>`- ${i.item}${i.flags.length?` (${i.flags.join(", ")})`:""}`).join("\n")}`).join("\n\n");
+  copyText(text).then(()=>toast("Grocery list copied"));
+}
+
+function renderProfiles(){
+  const wrap = qs("#profileGrid");
+  if(!wrap) return;
+  wrap.innerHTML = data.profiles.map(p => `<article class="profile-card"><h3>${escapeHtml(p.name)}</h3><p class="muted" style="line-height:1.6">${escapeHtml(p.notes||"")}</p><div class="profile-list"><strong>Restrictions:</strong> ${(p.restrictions||[]).join(", ") || "None"}<br><strong>Blocked:</strong> ${(p.blockedIngredients||[]).slice(0,14).join(", ") || "None"}<br><strong>Warnings:</strong> ${(p.warningIngredients||[]).slice(0,10).join(", ") || "None"}<br><strong>Likes:</strong> ${(p.preferredIngredients||[]).join(", ") || "None"}</div></article>`).join("");
+}
+function renderCollections(){
+  const wrap = qs("#collectionGrid");
+  if(!wrap) return;
+  wrap.innerHTML = (data.collections||[]).map(c => `<article class="collection-card"><h3>${escapeHtml(c.label)}</h3><p class="muted" style="line-height:1.6">${escapeHtml(c.desc||"")}</p><div class="profile-list"><strong>Recipes:</strong><br>${(c.recipeIds||[]).map(id=>escapeHtml(getRecipe(data,id)?.title||id)).join("<br>")}</div></article>`).join("");
+}
+
+function renderPantry(){
+  const input = qs("#pantryInput");
+  if(input) input.value = pantryItems.join(", ");
+}
+function cookThisTonight(){
+  const maxTime = Number(qs("#tonightTime")?.value || 45);
+  const recommendation = recommendTonight(data, selectedProfileIds, pantryItems, maxTime);
+  const wrap = qs("#tonightResult");
+  if(!recommendation){wrap.innerHTML = `<div class="empty">No safe recommendation found. Try increasing the time or adding more recipes.</div>`; return;}
+  const r = recommendation.recipe;
+  const label = getSafetyLabel(recommendation.analysis, profileNames());
+  wrap.innerHTML = `<div class="recommend-card"><div class="panel-kicker">Tonight's best match</div><h3 class="recommend-title">${escapeHtml(r.title)}</h3><p class="muted" style="line-height:1.7">Score ${recommendation.score}/100 • Pantry ${recommendation.pantry.count}/${recommendation.pantry.total} • ${r.time} minutes</p><div style="margin:16px 0"><span class="flag ${label.cls.replace("status","flag")}">${escapeHtml(label.text)}</span></div><button class="btn btn-primary" onclick="openRecipe('${r.id}')">Open Recipe</button></div>`;
+}
+
+function startCookMode(){
+  const recipe = getRecipe(data, selectedRecipeId);
+  if(!recipe) return;
+  cookSteps = recipe.steps || [];
+  cookIndex = 0;
+  qs("#cookTitle").textContent = recipe.title;
+  qs("#cookMode").classList.add("open");
+  renderCookStep();
+}
+function renderCookStep(){
+  qs("#cookCounter").textContent = `${cookIndex+1} / ${cookSteps.length}`;
+  qs("#cookStep").textContent = cookSteps[cookIndex] || "No steps added yet.";
+}
+function moveCookStep(delta){
+  cookIndex = Math.max(0, Math.min(cookSteps.length-1, cookIndex + delta));
+  renderCookStep();
+}
+function stopCookMode(){qs("#cookMode")?.classList.remove("open");}
