@@ -207,6 +207,7 @@ let RECIPES = [
   }
 ];
 
+"MyCuisine repair skipped:", error);
 let MEAL_PLANNER = {
   Monday: "turkey-rice-bowls",
   Tuesday: "steakhouse-salad",
@@ -215,7 +216,9 @@ let MEAL_PLANNER = {
   Friday: "",
   Saturday: "",
   Sunday: ""
-   /* ═══════════════════════════════════════════════════════════════
+};
+
+/* ═══════════════════════════════════════════════════════════════
    MyCuisine Compatibility Fix
    This makes the password/data readable by all versions of app.js/admin.js
 ═══════════════════════════════════════════════════════════════ */
