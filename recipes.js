@@ -215,4 +215,57 @@ let MEAL_PLANNER = {
   Friday: "",
   Saturday: "",
   Sunday: ""
+   /* ═══════════════════════════════════════════════════════════════
+   MyCuisine Compatibility Fix
+   This makes the password/data readable by all versions of app.js/admin.js
+═══════════════════════════════════════════════════════════════ */
+
+window.SITE_CONFIG = SITE_CONFIG;
+window.CATEGORIES = CATEGORIES;
+window.FRIEND_PROFILES = FRIEND_PROFILES;
+window.SUBSTITUTIONS = SUBSTITUTIONS;
+window.COLLECTIONS = COLLECTIONS;
+window.RECIPES = RECIPES;
+window.MEAL_PLANNER = MEAL_PLANNER;
+
+window.MC_DATA = {
+  config: SITE_CONFIG,
+  categories: CATEGORIES,
+  profiles: FRIEND_PROFILES,
+  substitutions: SUBSTITUTIONS,
+  collections: COLLECTIONS,
+  recipes: RECIPES,
+  planner: MEAL_PLANNER
 };
+
+/* Force repair old cached data so the correct password works */
+try {
+  const possibleKeys = [
+    "mycuisine.privateTable.v4",
+    "mycuisine.v5.data",
+    "mycuisine.privateTable.data"
+  ];
+
+  possibleKeys.forEach(function (key) {
+    const saved = localStorage.getItem(key);
+
+    if (saved) {
+      const data = JSON.parse(saved);
+
+      data.config = data.config || {};
+      data.config.friendAccessCode = "kitchen2026";
+      data.config.adminPassword = "mycuisine2026";
+
+      if (!data.categories) data.categories = CATEGORIES;
+      if (!data.profiles) data.profiles = FRIEND_PROFILES;
+      if (!data.substitutions) data.substitutions = SUBSTITUTIONS;
+      if (!data.collections) data.collections = COLLECTIONS;
+      if (!data.recipes) data.recipes = RECIPES;
+      if (!data.planner) data.planner = MEAL_PLANNER;
+
+      localStorage.setItem(key, JSON.stringify(data));
+    }
+  });
+} catch (error) {
+  console.warn("MyCuisine repair skipped:", error);
+}
