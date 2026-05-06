@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160">
+  <circle cx="80" cy="80" r="74" fill="#F6EFE6" stroke="#2B1E16" stroke-width="2"/>
+  <circle cx="80" cy="80" r="58" fill="none" stroke="#B66A3C" stroke-width="2"/>
+  <text x="80" y="78" text-anchor="middle" font-family="Georgia, serif" font-size="34" fill="#2B1E16">MC</text>
+  <text x="80" y="105" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#8C1D18" letter-spacing="3">PRIVATE</text>
+</svg>
