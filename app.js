@@ -28,6 +28,7 @@ function boot(){
   renderGrocery();
   renderPantry();
   setupEvents();
+  injectFeatureStyles();
 }
 
 document.addEventListener("DOMContentLoaded", boot);
@@ -65,6 +66,7 @@ function setupEvents(){
   qs("#autoPlan")?.addEventListener("click", autoFillPlanner);
   qs("#clearPlan")?.addEventListener("click", clearPlanner);
   qs("#copyGrocery")?.addEventListener("click", copyGrocery);
+  qs("#emailGrocery")?.addEventListener("click", emailGrocery);
   qs("#clearGrocery")?.addEventListener("click", () => { groceryItems=[]; localStorage.setItem(MC_GROCERY_KEY,"[]"); renderGrocery(); });
   qs("#pantryInput")?.addEventListener("input", e => { pantryItems=splitList(e.target.value); localStorage.setItem(MC_PANTRY_KEY, e.target.value); renderRecipes(); });
   qs("#cookTonight")?.addEventListener("click", cookThisTonight);
@@ -289,25 +291,132 @@ function copyPlan(){
   copyText(text).then(()=>toast("Meal plan copied"));
 }
 
-function renderGrocery(){
+function getGroceryRecipeIds(){
   try{groceryItems = JSON.parse(localStorage.getItem(MC_GROCERY_KEY)||"[]");}catch{groceryItems=[];}
   const plannedIds = Object.values(planner).filter(Boolean);
-  const allIds = unique([...groceryItems, ...plannedIds]);
-  const items = buildGroceryFromRecipeIds(data, allIds, currentProfiles());
+  return [...groceryItems, ...plannedIds].filter(Boolean);
+}
+
+function normalizeGroceryName(item){
+  return normalize(item)
+    .replace(/\b(fresh|baby|large|small|medium|chopped|diced|sliced|minced|boneless|skinless)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildGroceryWithQuantities(){
+  const ids = getGroceryRecipeIds();
+  const map = new Map();
+
+  ids.forEach(id => {
+    const recipe = getRecipe(data,id);
+    if(!recipe) return;
+    (recipe.ingredients||[]).forEach(item => {
+      const key = normalizeGroceryName(item);
+      if(!key) return;
+      if(!map.has(key)){
+        map.set(key, {
+          item,
+          count: 0,
+          recipes: [],
+          section: categorizeIngredient(item),
+          flags: []
+        });
+      }
+      const entry = map.get(key);
+      entry.count += 1;
+      if(!entry.recipes.includes(recipe.title)) entry.recipes.push(recipe.title);
+    });
+  });
+
+  const profiles = currentProfiles();
+  for(const entry of map.values()){
+    const fakeRecipe = { title: entry.item, ingredients: [entry.item], notes: "" };
+    const analysis = analyzeRecipeForProfiles(fakeRecipe, profiles, data);
+    if(analysis.level === "danger") entry.flags.push("Blocked / swap needed");
+    else if(analysis.level === "warning") entry.flags.push("Check label");
+  }
+
+  return [...map.values()].sort((a,b)=>a.section.localeCompare(b.section)||a.item.localeCompare(b.item));
+}
+
+function groceryLine(item){
+  const qty = item.count > 1 ? ` ×${item.count}` : "";
+  const usedIn = item.recipes?.length ? ` — used in ${item.recipes.length} meal${item.recipes.length===1?"":"s"}` : "";
+  return `${item.item}${qty}${usedIn}${item.flags.length?` (${item.flags.join(", ")})`:""}`;
+}
+
+function groceryText(){
+  const items = buildGroceryWithQuantities();
+  const sections = unique(items.map(i=>i.section));
+  return sections.map(section => `${section}\n${items.filter(i=>i.section===section).map(i=>`- ${groceryLine(i)}`).join("\n")}`).join("\n\n");
+}
+
+function ensureEmailButton(){
+  const actions = qs("#view-grocery .planner-actions");
+  if(actions && !qs("#emailGrocery")){
+    const btn = document.createElement("button");
+    btn.className = "btn btn-gold";
+    btn.id = "emailGrocery";
+    btn.type = "button";
+    btn.textContent = "Email Grocery List";
+    const copy = qs("#copyGrocery");
+    if(copy) copy.insertAdjacentElement("afterend", btn);
+    else actions.appendChild(btn);
+    btn.addEventListener("click", emailGrocery);
+  }
+}
+
+function renderGrocery(){
+  ensureEmailButton();
+  const items = buildGroceryWithQuantities();
   const wrap = qs("#groceryList");
   if(!wrap) return;
-  if(!items.length){wrap.innerHTML = `<div class="empty">No grocery items yet. Add a recipe or create a meal plan.</div>`; return;}
+  if(!items.length){
+    wrap.innerHTML = `<div class="empty">No grocery items yet. Add a recipe or create a meal plan.</div>`;
+    qs("#grocerySummary").textContent = "Planner + saved recipes";
+    return;
+  }
   const sections = unique(items.map(i=>i.section));
-  wrap.innerHTML = sections.map(section => `<div class="grocery-section"><h4>${escapeHtml(section)}</h4>${items.filter(i=>i.section===section).map(i=>`<div class="grocery-item"><span>${escapeHtml(i.item)}</span><span>${i.flags.length ? `<span class="flag ${i.flags[0].includes("Blocked")?"flag-danger":"flag-warning"}">${escapeHtml(i.flags[0])}</span>` : `<span class="flag flag-safe">OK</span>`}</span></div>`).join("")}</div>`).join("");
-  qs("#grocerySummary").textContent = `${items.length} item${items.length===1?"":"s"} from planner and saved recipes.`;
+  wrap.innerHTML = sections.map(section => `<div class="grocery-section"><h4>${escapeHtml(section)}</h4>${items.filter(i=>i.section===section).map(i=>`<div class="grocery-item"><span>${escapeHtml(i.item)}${i.count>1?` <strong>×${i.count}</strong>`:""}<small class="grocery-used">${i.recipes?.length?`Used in ${i.recipes.length} meal${i.recipes.length===1?"":"s"}`:""}</small></span><span>${i.flags.length ? `<span class="flag ${i.flags[0].includes("Blocked")?"flag-danger":"flag-warning"}">${escapeHtml(i.flags[0])}</span>` : `<span class="flag flag-safe">OK</span>`}</span></div>`).join("")}</div>`).join("");
+  qs("#grocerySummary").textContent = `${items.length} item${items.length===1?"":"s"} with quantities from planner and saved recipes.`;
 }
+
 function copyGrocery(){
-  const plannedIds = Object.values(planner).filter(Boolean);
-  const allIds = unique([...groceryItems, ...plannedIds]);
-  const items = buildGroceryFromRecipeIds(data, allIds, currentProfiles());
-  const sections = unique(items.map(i=>i.section));
-  const text = sections.map(section => `${section}\n${items.filter(i=>i.section===section).map(i=>`- ${i.item}${i.flags.length?` (${i.flags.join(", ")})`:""}`).join("\n")}`).join("\n\n");
+  const text = groceryText();
   copyText(text).then(()=>toast("Grocery list copied"));
+}
+
+function emailGrocery(){
+  const text = groceryText();
+  if(!text.trim()){ toast("No grocery items to email yet"); return; }
+  const subject = encodeURIComponent("MyCuisine Grocery List");
+  const body = encodeURIComponent(`MyCuisine Grocery List\n\n${text}`);
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  if(isMobile){
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    toast("Opening your mail app");
+    return;
+  }
+
+  const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&su=${subject}&body=${body}`;
+  const opened = window.open(gmailUrl, "_blank", "noopener,noreferrer");
+  if(!opened){
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+  }
+  toast("Opening email compose");
+}
+
+function injectFeatureStyles(){
+  if(document.querySelector("#mcFeatureStyle")) return;
+  const style = document.createElement("style");
+  style.id = "mcFeatureStyle";
+  style.textContent = `
+    .grocery-item span:first-child{display:flex;flex-direction:column;gap:3px}
+    .grocery-used{display:block;font-size:10px;line-height:1.35;color:var(--muted);font-weight:500;margin-top:2px}
+  `;
+  document.head.appendChild(style);
 }
 
 function renderProfiles(){
