@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>MyCuisine · Admin Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Geist:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="gate" id="adminGate">
+    <form class="gate-card" id="adminGateForm">
+      <img class="gate-logo gate-logo-light" src="assets/mycuisine-emblem-light.svg" alt="MyCuisine">
+      <img class="gate-logo gate-logo-dark" src="assets/mycuisine-emblem-dark.svg" alt="MyCuisine">
+      <h1 class="gate-title">Admin Portal</h1>
+      <p class="gate-copy">Enter the admin password to manage recipes, approvals, profiles, and exports.</p>
+      <div class="field"><label for="adminPass">Admin Password</label><input id="adminPass" type="password" placeholder="Enter admin password"></div>
+      <button class="btn btn-primary" style="width:100%" type="submit">Unlock Admin</button>
+      <div class="gate-error" id="adminGateError">That password did not work.</div>
+    </form>
+  </div>
+
+  <nav>
+    <div class="nav-inner">
+      <a href="index.html"><img class="nav-logo nav-logo-light" src="assets/mycuisine-logo-light.svg" alt="MyCuisine"><img class="nav-logo nav-logo-dark" src="assets/mycuisine-logo-dark.svg" alt="MyCuisine"></a>
+      <div class="nav-label">Admin Portal</div>
+      <div class="nav-actions"><a class="btn btn-soft" href="index.html">← Recipe View</a><div class="theme-pill"><span data-theme="light">Light</span><span data-theme="dark">Dark</span></div></div>
+    </div>
+  </nav>
+
+  <main class="layout">
+    <section class="hero" style="grid-template-columns:1fr">
+      <div>
+        <div class="eyebrow">MyCuisine control room</div>
+        <h1>Admin Portal</h1>
+        <div class="hero-rule"></div>
+        <p>Add recipes, approve friend submissions, manage friend profiles, review safety logic, and export a clean recipes.js file to upload to GitHub.</p>
+      </div>
+    </section>
+
+    <div class="tabs">
+      <button class="tab active" data-view="recipes">Recipes</button>
+      <button class="tab" data-view="approval">Approval Queue</button>
+      <button class="tab" data-view="profiles">Profiles</button>
+      <button class="tab" data-view="export">Export</button>
+    </div>
+
+    <section class="view active" id="view-recipes">
+      <div class="admin-layout">
+        <aside class="admin-panel">
+          <div class="section-top"><div class="section-kicker">Recipe List</div></div>
+          <button class="btn btn-primary" id="newRecipe" style="width:100%;margin-bottom:12px">New Recipe</button>
+          <div class="admin-list" id="recipeList"></div>
+        </aside>
+        <section class="admin-panel">
+          <div id="recipeEditorEmpty" class="empty hidden">Select or create a recipe.</div>
+          <div id="recipeEditorForm">
+            <div class="section-top"><div class="section-kicker">Recipe Editor</div><div class="section-note">Auto safety preview included</div></div>
+            <div class="grid3">
+              <div class="field"><label>Title</label><input id="rTitle"></div>
+              <div class="field"><label>Author</label><input id="rAuthor"></div>
+              <div class="field"><label>Status</label><select id="rStatus"><option>approved</option><option>pending</option><option>rejected</option></select></div>
+            </div>
+            <div class="grid3">
+              <div class="field"><label>Category</label><input id="rCategory"></div>
+              <div class="field"><label>Meal Type</label><input id="rMealType"></div>
+              <div class="field"><label>Difficulty</label><select id="rDifficulty"><option>Easy</option><option>Medium</option><option>Hard</option></select></div>
+            </div>
+            <div class="field"><label>Image URL</label><input id="rImage" placeholder="Optional food photo URL"></div>
+            <div class="field"><label>Tags</label><input id="rTags" placeholder="T.J.S Safe, High Protein, Meal Prep"></div>
+            <div class="grid3">
+              <div class="field"><label>Time</label><input id="rTime" type="number" min="1"></div>
+              <div class="field"><label>Servings</label><input id="rServings" type="number" min="1"></div>
+              <div class="field"><label>Calories</label><input id="rCalories" type="number" min="0"></div>
+            </div>
+            <div class="grid3">
+              <div class="field"><label>Protein</label><input id="rProtein" type="number" min="0"></div>
+              <div class="field"><label>Carbs</label><input id="rCarbs" type="number" min="0"></div>
+              <div class="field"><label>Fat</label><input id="rFat" type="number" min="0"></div>
+            </div>
+            <div class="grid2">
+              <div class="field"><label>Ingredients</label><textarea id="rIngredients" placeholder="One ingredient per line"></textarea></div>
+              <div class="field"><label>Steps</label><textarea id="rSteps" placeholder="One step per line"></textarea></div>
+            </div>
+            <div class="field"><label>Notes</label><textarea id="rNotes"></textarea></div>
+            <div class="field"><label>Recipe Versions</label><textarea id="rVersions" placeholder="T.J.S Safe: use olive oil instead of butter"></textarea></div>
+            <div class="section-top"><div class="section-kicker">Safety Preview</div></div>
+            <div id="safetyPreview"></div>
+            <div class="admin-toolbar">
+              <button class="btn btn-primary" id="saveRecipe">Save Recipe</button>
+              <button class="btn btn-success" id="approveRecipe">Approve</button>
+              <button class="btn btn-soft" id="pendingRecipe">Mark Pending</button>
+              <button class="btn btn-danger" id="deleteRecipe">Delete</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section class="view" id="view-approval">
+      <div class="section-top"><div class="section-kicker">Recipe Approval Queue</div><div class="section-note">Review before publishing</div></div>
+      <div id="approvalQueue"></div>
+    </section>
+
+    <section class="view" id="view-profiles">
+      <div class="admin-layout">
+        <aside class="admin-panel">
+          <div class="section-top"><div class="section-kicker">Profiles</div></div>
+          <button class="btn btn-primary" id="newProfile" style="width:100%;margin-bottom:12px">New Profile</button>
+          <div class="admin-list" id="profileList"></div>
+        </aside>
+        <section class="admin-panel">
+          <div id="profileEditorEmpty" class="empty hidden">Select or create a profile.</div>
+          <div id="profileEditorForm">
+            <div class="section-top"><div class="section-kicker">Profile Editor</div><div class="section-note">Custom safety rules</div></div>
+            <div class="grid2">
+              <div class="field"><label>Name</label><input id="pName"></div>
+              <div class="field"><label>Short Name</label><input id="pShort"></div>
+            </div>
+            <div class="field"><label>Notes</label><textarea id="pNotes"></textarea></div>
+            <div class="field"><label>Restrictions</label><input id="pRestrictions" placeholder="Dairy / Lactose, Gluten, Shellfish"></div>
+            <div class="grid2">
+              <div class="field"><label>Blocked Ingredients</label><textarea id="pBlocked" placeholder="milk, butter, cream"></textarea></div>
+              <div class="field"><label>Warning Ingredients</label><textarea id="pWarnings" placeholder="sauce, seasoning, dressing"></textarea></div>
+            </div>
+            <div class="grid2">
+              <div class="field"><label>Preferred Ingredients</label><input id="pPreferred" placeholder="chicken, steak, rice"></div>
+              <div class="field"><label>Disliked Ingredients</label><input id="pDisliked"></div>
+            </div>
+            <div class="admin-toolbar"><button class="btn btn-primary" id="saveProfile">Save Profile</button><button class="btn btn-danger" id="deleteProfile">Delete Profile</button></div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section class="view" id="view-export">
+      <div class="section-top"><div class="section-kicker">Export Data</div><div class="section-note">Copy or download recipes.js</div></div>
+      <div class="admin-panel">
+        <p class="muted" style="line-height:1.7;margin-bottom:16px">After making changes, click Export recipes.js and replace the existing recipes.js file in your GitHub Pages folder.</p>
+        <div class="admin-toolbar" style="margin-bottom:14px"><button class="btn btn-primary" id="exportBtn">Export recipes.js</button><button class="btn btn-soft" id="copyExport">Copy Export</button><button class="btn btn-danger" id="resetLocal">Reset Local Changes</button></div>
+        <textarea class="textarea jsonbox" id="exportText"></textarea>
+      </div>
+    </section>
+  </main>
+
+  <footer><div class="footer-inner"><div><span class="footer-brand">MyCuisine</span> · Admin Portal</div><div>Export recipes.js after updates</div></div></footer>
+
+  <script src="recipes.js"></script>
+  <script src="logic.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>
